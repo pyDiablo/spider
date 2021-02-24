@@ -69,7 +69,7 @@ def crawl(website, recursive=True, timeout_length_seconds=6, max_number_of_timeo
 
         # Sometimes urls start from '/'. e.g. "/books/", "/songs/" etc.
         # If that's the case, ignore the first element of url i.e. '/'
-        url = f"{website}{href[1:]}" if href[0] == '/' else f"{website}{href}"
+        url = website + (href[1:] if href.startswith('/') else href)
 
         if is_dir(url) and recursive:
             # If url points to a directory, and recursive is True
