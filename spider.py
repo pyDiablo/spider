@@ -4,10 +4,9 @@ import requests
 from bs4 import BeautifulSoup
 
 
-pattern = re.compile(r'\?(C=(N|M|S|D)[;&]?O=(D|A))|\?[NMSDAnmsda]+')  # pattern to find ignored_hrefs
-ext_pattern = re.compile(r'\.[A-Za-z0-9]+$')  # pattern to find ignored_exts
-ignored_hrefs = ['/', '../', '#', 'wget-log']  # hrefs to igone
-ignored_exts = ['/', '-', '#']  # extensions to ignore
+PATTERN = re.compile(r'\?(C=(N|M|S|D)[;&]?O=(D|A))|\?[NMSDAnmsda]+')  # pattern to find IGNORED_HREFS
+EXT_PATTERN = re.compile(r'\.[A-Za-z0-9]+$')  # pattern to find IGNORED_EXTS
+IGNORED_HREFS = ['/', '../', '#', 'wget-log']  # hrefs to ignore
 
 
 def is_dir(url):
@@ -50,12 +49,12 @@ def crawl(website, recursive=True):
     for link in soup.find_all('a'):
         href = link.get('href')  # Value of the href attribute of link
         # Use regex to find url patterns to ignore
-        matches = re.finditer(pattern, href)
+        matches = re.finditer(PATTERN, href)
         for match in matches:
             # Add matches to IGNORED_URLS list
-            ignored_hrefs.append(match.group())
+            IGNORED_HREFS.append(match.group())
 
-        if href in ignored_hrefs:
+        if href in IGNORED_HREFS:
             # Continue to next iteration if url is to be ignored
             continue
         else:
@@ -105,7 +104,7 @@ def getStats():
         # Iterate through each line
         for line_num, line in enumerate(links, start=1):
             # Use regex to find extension patterns in line
-            matches = re.finditer(ext_pattern, line)
+            matches = re.finditer(EXT_PATTERN, line)
             for match in matches:
                 # Add matches to extensions list
                 extensions.append(match.group().lower())  # Used lower() for string comparison
