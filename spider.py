@@ -74,7 +74,13 @@ def crawl(website, recursive=True, timeout_length_seconds=6, max_number_of_timeo
 
         if is_dir(url) and recursive:
             # If url points to a directory, and recursive is True
-            crawl(url)  # Crawl that url
+            # Crawl that url
+            crawl(
+                url,
+                recursive=recursive,
+                timeout_length_seconds=timeout_length_seconds,
+                max_number_of_timeouts=max_number_of_timeouts
+            )
             continue
 
         # If url points to a file
