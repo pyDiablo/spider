@@ -1,5 +1,4 @@
 import re
-import time
 import requests
 from bs4 import BeautifulSoup
 
@@ -11,13 +10,14 @@ IGNORED_HREFS = ['/', '../', '#', 'wget-log']  # hrefs to ignore
 
 def is_dir(url):
     """ Returns True if given url belongs to a directory, otherwise returns false """
-    return True if url[-1] == '/' else False
+    # could be return url[-1] == '/' as well
+    return url.endswith('/')
 
 
 def write_link(url):
     """ Appends links to a text file """
     with open('links.txt', 'a') as file:
-        file.write(url.lower() + "\n")
+        file.write(url + "\n")
 
 
 def write_stats(stat):
@@ -26,24 +26,31 @@ def write_stats(stat):
         file.write(stat + "\n")
 
 
-def crawl(website, recursive=True):
+def crawl(website, recursive=True, timeout_length_seconds=6, max_number_of_timeouts=5):
     """ Crawls the given website. 'recursive' tells if you want to crawl through folders/directories """
     print(f'Crawling {website}...')
 
     # Make a request and make soup
-    try:
-        r = requests.get(website, timeout=6)
+    made_sucessful_request = False
+    timeout_counter = 0
+    while not made_sucessful_request:
+        if timeout_counter >= max_number_of_timeouts:
+            print(f'ERROR: Max number ({max_number_of_timeouts}) of timeouts reached')
+            return
 
-    except requests.exceptions.Timeout:
-        print("ERROR: Request timed out!\nRetrying in 5 seconds...")
-        time.sleep(5)
-        crawl(website)
+        try:
+            r = requests.get(website, timeout=timeout_length_seconds)
+            made_sucessful_request = True
 
-    except requests.exceptions.ConnectionError:
-        print('ERROR: Make sure you are connected to the internet!')
+        except requests.exceptions.Timeout:
+            timeout_counter += 1
+            continue
 
-    else:
-        soup = BeautifulSoup(r.text, 'html.parser')
+        except requests.exceptions.ConnectionError:
+            print("ERROR: Request timed out!\nRetrying in 5 seconds...")
+            return
+
+    soup = BeautifulSoup(r.text, 'html.parser')
 
     # Get all the links from soup
     for link in soup.find_all('a'):
@@ -57,20 +64,26 @@ def crawl(website, recursive=True):
         if href in IGNORED_HREFS:
             # Continue to next iteration if url is to be ignored
             continue
-        else:
-            # Otherwise, do this:
 
-            # Sometimes urls start from '/'. e.g. "/books/", "/songs/" etc.
-            # If that's the case, ignore the first element of url i.e. '/'
-            url = f"{website}{href[1:]}" if href[0] == '/' else f"{website}{href}"
+        # Otherwise, do this:
 
-            if is_dir(url) and recursive:
-                # If url points to a directory, and recursive is True
-                crawl(url)  # Crawl that url
-                continue
-            else:
-                # If url points to a file
-                write_link(url)  # Write that url to a file
+        # Sometimes urls start from '/'. e.g. "/books/", "/songs/" etc.
+        # If that's the case, ignore the first element of url i.e. '/'
+        url = website + (href[1:] if href.startswith('/') else href)
+
+        if is_dir(url) and recursive:
+            # If url points to a directory, and recursive is True
+            # Crawl that url
+            crawl(
+                url,
+                recursive=recursive,
+                timeout_length_seconds=timeout_length_seconds,
+                max_number_of_timeouts=max_number_of_timeouts
+            )
+            continue
+
+        # If url points to a file
+        write_link(url)  # Write that url to a file
 
 
 def count_extensions(extensions):
@@ -85,10 +98,10 @@ def count_extensions(extensions):
             # Iterate through the lines
             for line in links:
                 # Use regex to find extension instances on line
-                matches = re.finditer(f'.{ext}$', line)
-                for match in matches:
-                    # Count extensions
-                    ext_count += 1
+                matches = re.findall(f'.{ext}$', line)
+                # Count extensions
+                ext_count += len(matches)
+
         print(f'{ext}: {ext_count} files')
         write_stats(f'{ext}: {ext_count} files')
 
@@ -100,9 +113,10 @@ def getStats():
     extensions = list()
 
     # Open links file to read
-    with open('links.txt', 'r') as links:
+    with open('links.txt', 'r') as f:
+        links = f.readlines()
         # Iterate through each line
-        for line_num, line in enumerate(links, start=1):
+        for line in links:
             # Use regex to find extension patterns in line
             matches = re.finditer(EXT_PATTERN, line)
             for match in matches:
@@ -117,11 +131,11 @@ def getStats():
             extensions = list(extensions_set)
 
     # Print the results
-    print(f'{line_num} total links')
+    print(f'{len(links)} total links')
     print(f'Found these extensions: {extensions}')
 
     # Write the results to stats file
-    write_stats(f'{line_num} total links\nFound these extensions: {extensions}')
+    write_stats(f'{len(links)} total links\nFound these extensions: {extensions}')
 
     # Count the no. of files belonging to each extension
     count_extensions(extensions)
