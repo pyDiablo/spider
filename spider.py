@@ -1,13 +1,29 @@
 import re
 import requests
-from bs4 import BeautifulSoup
+import requests_cache
+from urllib.parse import unquote
+from bs4 import BeautifulSoup, SoupStrainer
 
+# Webiste to crawl
+WEBSITE = 'https://korea-dpr.com/mp3/'
+# WEBSITE = 'http://128.199.129.79:666/'
+# WEBSITE = 'http://46.4.132.219:999/'
 
-WEBSITE = 'https://korea-dpr.com/mp3/'  # Webiste to crawl
-URLS = list()
+URLS = list()  # List to store all the urls
 PATTERN = re.compile(r'\?(C=(N|M|S|D)[;&]?O=(D|A))|\?[NMSDAnmsda]+')  # pattern to find IGNORED_HREFS
 EXT_PATTERN = re.compile(r'\.[A-Za-z0-9]+$')  # pattern to find IGNORED_EXTS
-IGNORED_HREFS = ['/', '../', '#', 'wget-log']  # hrefs to ignore
+IGNORED_HREFS = ['/', '../', '#', 'wget-log', 'design/']  # hrefs to ignore
+
+# Caches all responses to a local database.
+# In case you have to run the request again,
+# responses will be loaded from the database
+# instead of requesting again.
+requests_cache.install_cache('request_cache')
+
+# Create a session, so connection doesn't have
+# to be established again and again after every
+# request.
+session = requests.Session()
 
 
 def is_dir(url):
@@ -32,7 +48,7 @@ def crawl(website, recursive=True, max_retries=4):
             return
 
         try:
-            r = requests.get(website, timeout=6)
+            r = session.get(website)
             made_sucessful_request = True
 
         except requests.exceptions.Timeout:
@@ -44,7 +60,7 @@ def crawl(website, recursive=True, max_retries=4):
             print("ERROR: Not connected to the internet!")
             return
 
-    soup = BeautifulSoup(r.text, 'lxml')
+    soup = BeautifulSoup(r.text, 'lxml', parse_only=SoupStrainer('a'))
 
     # Get all the links from soup
     for link in soup.find_all('a'):
@@ -69,11 +85,16 @@ def crawl(website, recursive=True, max_retries=4):
         # If url points to a directory, and recursive is True
         if is_dir(url) and recursive:
             # Crawl that url
-            crawl(url)
+            c = crawl(url)
+            for c_url in c:
+                URLS.append(c_url)
             continue
 
         # Otherwise
         URLS.append(url)
+
+    for url in URLS:
+        yield url
 
 
 def get_stats():
@@ -130,18 +151,25 @@ def get_stats():
         # Write file counts to the file
         file.write(f'{ext}: {file_count} file(s)\n')
 
-    # Close the file after reading
+    # Close the file after writing
     file.close()
 
 
 def main():
     # Crawl the wesbite
-    crawl(WEBSITE)
+    urls = crawl(WEBSITE)
+
+    # Close the session
+    session.close()
 
     # Write urls to a text file
     with open('links.txt', 'a') as file:
-        for url in URLS:
-            file.write(f'{url.lower()}\n')
+        for url in urls:
+            try:
+                file.write(f'{unquote(url.lower())}\n')
+
+            except UnicodeEncodeError:
+                file.write(f'{url.lower()}\n')
 
     # Get the statistics
     get_stats()
