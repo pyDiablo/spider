@@ -25,17 +25,17 @@ def write_stats(stat):
         file.write(stat + "\n")
 
 
-def crawl(website, recursive=True, max_timeouts=3):
+def crawl(website, recursive=True, max_retries=3):
     """ Crawls the given website. 'recursive' tells if you want to crawl through folders/directories """
     print(f'Crawling {website}...')
 
     made_sucessful_request = False
-    timeout_count = 0
+    retry_count = 0
 
     # Make a request and make soup
     while not made_sucessful_request:
-        if timeout_count >= max_timeouts:
-            print(f'ERROR: Max number of timeouts reached!')
+        if retry_count >= max_retries:
+            print(f'ERROR: Max number of retries ({max_retries}) reached!')
             return
 
         try:
@@ -44,7 +44,7 @@ def crawl(website, recursive=True, max_timeouts=3):
 
         except requests.exceptions.Timeout:
             print("ERROR: Request timed out! Retrying...")
-            timeout_count += 1
+            retry_count += 1
             continue
 
         except requests.exceptions.ConnectionError:
