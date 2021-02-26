@@ -3,6 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 
 
+WEBSITE = 'https://korea-dpr.com/mp3/'  # Webiste to crawl
+URLS = list()
 PATTERN = re.compile(r'\?(C=(N|M|S|D)[;&]?O=(D|A))|\?[NMSDAnmsda]+')  # pattern to find IGNORED_HREFS
 EXT_PATTERN = re.compile(r'\.[A-Za-z0-9]+$')  # pattern to find IGNORED_EXTS
 IGNORED_HREFS = ['/', '../', '#', 'wget-log']  # hrefs to ignore
@@ -13,20 +15,11 @@ def is_dir(url):
     return url.endswith('/')
 
 
-def write_url(url):
-    """ Appends links to a text file """
-    with open('links.txt', 'a') as file:
-        file.write(url.lower() + "\n")
+def crawl(website, recursive=True, max_retries=4):
+    """ Crawls the given website and yields the urls """
+    # 'recursive' tells if you want to crawl through folders/directories
+    # 'max_retries' is the number of retries in case request timeouts
 
-
-def write_stats(stat):
-    """ Appends statistics to a text file """
-    with open('stats.txt', 'a') as file:
-        file.write(stat + "\n")
-
-
-def crawl(website, recursive=True, max_retries=3):
-    """ Crawls the given website. 'recursive' tells if you want to crawl through folders/directories """
     print(f'Crawling {website}...')
 
     made_sucessful_request = False
@@ -51,7 +44,7 @@ def crawl(website, recursive=True, max_retries=3):
             print("ERROR: Not connected to the internet!")
             return
 
-    soup = BeautifulSoup(r.text, 'html.parser')
+    soup = BeautifulSoup(r.text, 'lxml')
 
     # Get all the links from soup
     for link in soup.find_all('a'):
@@ -66,9 +59,12 @@ def crawl(website, recursive=True, max_retries=3):
             # Continue to next iteration if url is to be ignored
             continue
 
-        # Sometimes hrefs start from '/'. e.g. "/books/", "/songs/" etc.
-        # If that's the case, ignore the first '/' in href
-        url = website + (href[1:] if href.startswith('/') else href)
+        elif href.startswith('/'):
+            # Continue to next iteration if href starts with '/'
+            # It's probably pointing to a directory, up one level in a directory tree
+            continue
+
+        url = f'{website}{href}'
 
         # If url points to a directory, and recursive is True
         if is_dir(url) and recursive:
@@ -77,33 +73,11 @@ def crawl(website, recursive=True, max_retries=3):
             continue
 
         # Otherwise
-        write_url(url)  # Write that url to a file
+        URLS.append(url)
 
 
-def count_extensions(extensions):
-    """ Prints the count of files belonging to an extension """
+def get_stats():
 
-    # Iterate through extensions list
-    for ext in extensions:
-        ext_count = 0  # Extension Count
-
-        # Open links file to read
-        with open('links.txt', 'r') as links:
-            # Iterate through the lines
-            for line in links:
-                # Use regex to find extension instances on line
-                matches = re.findall(f'.{ext}$', line)
-                # Count extensions
-                ext_count += len(matches)
-
-        print(f'{ext}: {ext_count} file(s)')
-        write_stats(f'{ext}: {ext_count} file(s)')
-
-
-def getStats():
-    """ Shows statistics related to OD """
-
-    # Make an empty extensions list
     extensions = list()
 
     try:
@@ -111,51 +85,66 @@ def getStats():
         file = open('links.txt', 'r')
 
     except FileNotFoundError:
-        print("ERROR: 'links.txt' does not exist! Cannot write statistics.")
+        print("ERROR: 'links.txt' does not exist! Cannot get statistics.")
         return
 
-    links = file.readlines()
-    # Iterate through each line
-    for line in links:
-        # Use regex to find extension patterns in line
-        matches = re.finditer(EXT_PATTERN, line)
-        for match in matches:
-            # Add matches to extensions list
-            extensions.append(match.group().lower())  # Used lower() for string comparison
+    # Read urls from links file
+    urls = file.read().splitlines()
 
-        # Convert extensions list to a set
-        # to filter out the duplicate extensions from the list
-        extensions_set = set(extensions)
-
-        # Convert the set back to list (without duplicates)
-        extensions = list(extensions_set)
-
-    # Print the results
-    print(f'{len(links)} total link(s)')
-    print(f'Found these extension(s): {extensions}')
-
-    # Write the results to stats file
-    write_stats(f'{len(links)} total link(s)\nFound these extension(s): {extensions}')
-
+    # Close the file after reading
     file.close()
 
-    # Count the no. of files belonging to each extension
-    count_extensions(extensions)
+    # Iterate through urls
+    for url in urls:
+        # Use regex to find extension pattern from url
+        matches = re.finditer(EXT_PATTERN, url)
+        for match in matches:
+            # If extensions list does not already contain the matched extension
+            if match.group() not in extensions:
+                # Append matched extension to extensions list
+                extensions.append(match.group().lower())
+            break
+
+    print(f'{len(urls)} total link(s)\nFound these extension(s): {extensions}')
+
+    # Open stats file
+    file = open('stats.txt', 'w')
+
+    # Write statistics to the file
+    file.write(f'URL: {WEBSITE}\n\n{len(urls)} total link(s)\nFound these extension(s): {extensions}\n')
+
+    # Get file counts
+    # Iterate through extensions
+    for ext in extensions:
+        # Set file count initially to 0
+        file_count = 0
+        # Iterate through urls
+        for url in urls:
+            # If extension is in the url
+            for match in re.finditer(f'{ext}$', url):
+                # Increment file count
+                file_count += 1
+
+        print(f'{ext}: {file_count} file(s)')
+
+        # Write file counts to the file
+        file.write(f'{ext}: {file_count} file(s)\n')
+
+    # Close the file after reading
+    file.close()
 
 
 def main():
-    # Webiste to crawl
-    website = 'https://korea-dpr.com/mp3/'
-    # website = 'http://34.105.17.91:8000/'
-
     # Crawl the wesbite
-    crawl(website)
+    crawl(WEBSITE)
 
-    # Write the website URL to stats file
-    write_stats(f'URL: {website}\n')
+    # Write urls to a text file
+    with open('links.txt', 'a') as file:
+        for url in URLS:
+            file.write(f'{url.lower()}\n')
 
-    # get the stats and print them
-    getStats()
+    # Get the statistics
+    get_stats()
 
 
 if __name__ == '__main__':
