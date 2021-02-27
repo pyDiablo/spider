@@ -9,16 +9,15 @@ WEBSITE = 'https://korea-dpr.com/mp3/'
 # WEBSITE = 'http://128.199.129.79:666/'
 # WEBSITE = 'http://46.4.132.219:999/'
 
-URLS = list()  # List to store all the urls
 PATTERN = re.compile(r'\?(C=(N|M|S|D)[;&]?O=(D|A))|\?[NMSDAnmsda]+')  # pattern to find IGNORED_HREFS
 EXT_PATTERN = re.compile(r'\.[A-Za-z0-9]+$')  # pattern to find IGNORED_EXTS
-IGNORED_HREFS = ['/', '../', '#', 'wget-log', 'design/']  # hrefs to ignore
+IGNORED_HREFS = ['/', '../', '#', 'wget-log']  # hrefs to ignore
 
 # Caches all responses to a local database.
 # In case you have to run the request again,
 # responses will be loaded from the database
 # instead of requesting again.
-requests_cache.install_cache('request_cache')
+requests_cache.install_cache('req_cache')
 
 # Create a session, so connection doesn't have
 # to be established again and again after every
@@ -38,18 +37,22 @@ def crawl(website, recursive=True, max_retries=4):
 
     print(f'Crawling {website}...')
 
-    made_sucessful_request = False
+    made_successful_request = False
     retry_count = 0
+    urls = list()
+
+    if recursive is False:
+        print("INFO: Skipping directories because recursive is set to 'False'")
 
     # Make a request and make soup
-    while not made_sucessful_request:
+    while not made_successful_request:
         if retry_count >= max_retries:
             print(f'ERROR: Max number of retries ({max_retries}) reached!')
             return
 
         try:
-            r = session.get(website)
-            made_sucessful_request = True
+            r = session.get(website, timeout=6)
+            made_successful_request = True
 
         except requests.exceptions.Timeout:
             print("ERROR: Request timed out! Retrying...")
@@ -87,13 +90,13 @@ def crawl(website, recursive=True, max_retries=4):
             # Crawl that url
             c = crawl(url)
             for c_url in c:
-                URLS.append(c_url)
+                urls.append(c_url)
             continue
 
         # Otherwise
-        URLS.append(url)
+        urls.append(url)
 
-    for url in URLS:
+    for url in urls:
         yield url
 
 
@@ -126,7 +129,7 @@ def get_stats():
                 extensions.append(match.group().lower())
             break
 
-    print(f'{len(urls)} total link(s)\nFound these extension(s): {extensions}')
+    print(f'\n{len(urls)} total link(s)\nFound these extension(s): {extensions}')
 
     # Open stats file
     file = open('stats.txt', 'w')
@@ -163,7 +166,7 @@ def main():
     session.close()
 
     # Write urls to a text file
-    with open('links.txt', 'a') as file:
+    with open('links.txt', 'w') as file:
         for url in urls:
             try:
                 file.write(f'{unquote(url.lower())}\n')
