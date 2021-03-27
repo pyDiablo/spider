@@ -13,7 +13,7 @@ def main():
         # 'http://128.199.129.79:666/',
         # 'https://korea-dpr.com/mp3/',
         # 'http://46.4.132.219:999/',
-        'https://mirror.futureweb.be/manjaro/arm-stable/'
+        # 'https://mirror.futureweb.be/manjaro/arm-stable/'
     ]
 
     # If sny of the input URL files exist, add it to the list as well
@@ -24,9 +24,10 @@ def main():
                     # Strips whitespace in case there is extra at the end of the line
                     # Splits by space in case there are multiple words or a comment after that (meaning 1 URL per line and it must be at the beginning of the line)
                     # If the first character of the first word of the line is '#', skip the line
-                    split = line.strip().split(' ')
-                    if split[0][0] != "#":
-                        scan_queue.append(split[0])
+                    if len(line.strip()) > 0:
+                        split = line.strip().split(' ')
+                        if split[0][0] != "#":
+                            scan_queue.append(split[0])
     
     urls = idx.scan(scan_queue)
 
