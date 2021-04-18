@@ -13,6 +13,7 @@ class Indexer:
     results_queue = deque()
     working_threads = {}
     STOP_WORKERS = False
+    is_quiet = False
 
     def __init__(self, max_threads=None):
         self.max_threads = max_threads or cpu_count()
@@ -81,7 +82,8 @@ class Indexer:
         while not self.STOP_WORKERS:
             try:
                 folder_url = self.scan_queue.get(timeout=0.01)
-                print(f'Crawling {folder_url}')
+                if not self.is_quiet:
+                    print(f'Crawling {folder_url}')
             except Empty:
                 continue
 
@@ -104,7 +106,8 @@ class Indexer:
 
             if self.scan_queue.empty() and not self.threads_working:
                 self.STOP_WORKERS = True
-                print('Finished!')
+                if not self.is_quiet:
+                    print('Finished!')
 
     def scan(self, urls):
         for url in urls:
@@ -149,7 +152,8 @@ class Indexer:
                         stats_file.write(f'{ext}: {count} file(s)\n')
                         urls_file.seek(0)
 
-    def save(self, output_file, parsed_urls):
+    def save(self, output_file, is_quiet_input, parsed_urls):
+        self.is_quiet = is_quiet_input
         """ Saves urls to a file on disk """
         with open(output_file, 'w') as file:
             urls_processed = 0
