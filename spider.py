@@ -4,6 +4,7 @@ import os
 def main():
     url_files_input = ["urls.txt"]
     url_file_output = "all_urls.txt"
+    quiet_output = False # True for no output (cleaner on Terminal)
 
     idx = Indexer()
     
@@ -31,7 +32,7 @@ def main():
     
     urls = idx.scan(scan_queue)
 
-    idx.save(url_file_output, urls)
+    idx.save(url_file_output, urls, quiet_output)
 
 if __name__ == '__main__':
     main()
